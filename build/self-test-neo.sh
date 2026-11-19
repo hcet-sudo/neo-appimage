@@ -6,6 +6,9 @@
 #      ANSI escape output — proves curses initialization and the draw loop
 #      actually ran (the strongest non-interactive check a curses app allows)
 # Usage: self-test-neo.sh <neo-appimage-or-inner-binary-path>
+#
+# Every captured invocation prints its rc and output BEFORE assertions, so
+# a failure in CI shows the actual error instead of dying silently.
 set -euo pipefail
 
 NEO_APP="$(readlink -f "$1")"
@@ -21,18 +24,55 @@ if [ -n "${EMU_PREFIX:-}" ]; then
   PREFIX="$EMU_PREFIX"
 fi
 
+# Probe: extract the AppImage (if it is one) so we can retry with the inner
+# binary directly when the extract-and-run path fails — that separates
+# runtime/AppRun problems from binary problems in one run.
+EXTRACTED=""
+echo "--- extraction probe ---"
+if ( cd "$T" && "$NEO_APP" --appimage-extract >/dev/null 2>&1 ) \
+     && [ -x "$T/squashfs-root/usr/bin/neo" ]; then
+  EXTRACTED="$T/squashfs-root/usr/bin/neo"
+  echo "extracted OK: $(ls -la "$T/squashfs-root/usr/bin/neo")"
+else
+  echo "not an AppImage (or extraction unavailable) — using the given path"
+fi
+
 echo "--- version ---"
-V="$(APPIMAGE_EXTRACT_AND_RUN=1 $PREFIX "$NEO_APP" --version 2>&1 | head -1)"
+set +e
+V="$(APPIMAGE_EXTRACT_AND_RUN=1 $PREFIX "$NEO_APP" --version 2>&1 | head -3)"
+rc=$?
+set -e
 echo "$V"
+if [ "$rc" != 0 ]; then
+  echo "--version exited rc=$rc (output above)" >&2
+  if [ -n "$EXTRACTED" ]; then
+    echo "--- retry with the extracted inner binary ---"
+    set +e
+    "$EXTRACTED" --version 2>&1
+    echo "inner rc=$?"
+    set -e
+  fi
+  exit 1
+fi
 case "$V" in
   neo\ *) : ;;
-  *) echo "unexpected --version output: '$V'" >&2; exit 1 ;;
+  *) echo "unexpected --version output (expected 'neo <version>')" >&2; exit 1 ;;
 esac
 
 echo "--- help ---"
-APPIMAGE_EXTRACT_AND_RUN=1 $PREFIX "$NEO_APP" --help 2>&1 | grep -q "^Usage: neo" \
-  || { echo "usage text missing from --help output" >&2; exit 1; }
-echo "Usage: neo ... OK"
+set +e
+H="$(APPIMAGE_EXTRACT_AND_RUN=1 $PREFIX "$NEO_APP" --help 2>&1 | head -3)"
+rc=$?
+set -e
+echo "$H"
+if [ "$rc" != 0 ]; then
+  echo "--help exited rc=$rc (output above)" >&2
+  exit 1
+fi
+if ! echo "$H" | grep -q "^Usage: neo"; then
+  echo "usage text missing from --help output" >&2
+  exit 1
+fi
 
 echo "--- render test (pty, ~3 s) ---"
 export TERM="${TERM:-xterm-256color}"
