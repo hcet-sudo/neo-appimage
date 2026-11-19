@@ -68,7 +68,9 @@ if [ "$RUN_RC" != 0 ]; then
   fi
   exit 1
 fi
-tr -d '\r' < "$T/v.raw" | grep -q "^neo " \
+# The banner may carry ncurses teardown escapes on the same line
+# ("...neo 0.6.1"), so match anywhere, not at line start.
+tr -d '\r' < "$T/v.raw" | grep -qE "neo [0-9]+(\.[0-9]+)+" \
   || { echo "unexpected --version output (expected 'neo <version>')" >&2; exit 1; }
 
 echo "--- help (pty) ---"
@@ -77,7 +79,7 @@ if [ "$RUN_RC" != 0 ]; then
   echo "--help exited rc=$RUN_RC (output above)" >&2
   exit 1
 fi
-tr -d '\r' < "$T/h.raw" | grep -q "^Usage: neo" \
+tr -d '\r' < "$T/h.raw" | grep -q "Usage: neo" \
   || { echo "usage text missing from --help output" >&2; exit 1; }
 
 echo "--- render test (pty, ~3 s) ---"
