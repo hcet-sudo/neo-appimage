@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # Self-test for the neo AppImage:
-#   1) --version prints the neo banner and exits 0 (no curses needed)
+#   1) --version prints the neo banner and exits 0
 #   2) --help prints the usage text and exits 0
 #   3) render test: run neo in a pseudo-tty for a few seconds and require
 #      ANSI escape output — proves curses initialization and the draw loop
 #      actually ran (the strongest non-interactive check a curses app allows)
 # Usage: self-test-neo.sh <neo-appimage-or-inner-binary-path>
 #
+# ALL invocations run inside a pty (script(1)): neo initializes ncurses
+# unconditionally — even on --version — and cbreak() fails without a real
+# terminal, which is exactly what happens on tty-less CI runners.
 # Every captured invocation prints its rc and output BEFORE assertions, so
 # a failure in CI shows the actual error instead of dying silently.
 set -euo pipefail
@@ -43,42 +46,39 @@ else
   echo "not an AppImage (or extraction unavailable) — using the given path"
 fi
 
-echo "--- version ---"
-set +e
-V="$(APPIMAGE_EXTRACT_AND_RUN=1 $PREFIX "$NEO_APP" --version 2>&1 | head -3)"
-rc=$?
-set -e
-echo "$V"
-if [ "$rc" != 0 ]; then
-  echo "--version exited rc=$rc (output above)" >&2
+# run_in_pty CMD RAWFILE: run a fully assembled command string in a pty,
+# capture everything into RAWFILE, echo the cleaned output. Returns the
+# child's exit code via $RUN_RC.
+run_in_pty() {
+  set +e
+  timeout 10 script -qec "$1" "$2"
+  RUN_RC=$?
+  set -e
+  tr -d '\r' < "$2" | head -4
+}
+
+echo "--- version (pty) ---"
+run_in_pty "APPIMAGE_EXTRACT_AND_RUN=1 $PREFIX $NEO_APP --version" "$T/v.raw"
+if [ "$RUN_RC" != 0 ]; then
+  echo "--version exited rc=$RUN_RC (output above)" >&2
   if [ -n "$EXTRACTED" ]; then
     echo "--- retry with the extracted inner binary ---"
-    set +e
-    "$EXTRACTED" --version 2>&1
-    echo "inner rc=$?"
-    set -e
+    run_in_pty "$EXTRACTED --version" "$T/v2.raw"
+    echo "inner rc=$RUN_RC"
   fi
   exit 1
 fi
-case "$V" in
-  neo\ *) : ;;
-  *) echo "unexpected --version output (expected 'neo <version>')" >&2; exit 1 ;;
-esac
+tr -d '\r' < "$T/v.raw" | grep -q "^neo " \
+  || { echo "unexpected --version output (expected 'neo <version>')" >&2; exit 1; }
 
-echo "--- help ---"
-set +e
-H="$(APPIMAGE_EXTRACT_AND_RUN=1 $PREFIX "$NEO_APP" --help 2>&1 | head -3)"
-rc=$?
-set -e
-echo "$H"
-if [ "$rc" != 0 ]; then
-  echo "--help exited rc=$rc (output above)" >&2
+echo "--- help (pty) ---"
+run_in_pty "APPIMAGE_EXTRACT_AND_RUN=1 $PREFIX $NEO_APP --help" "$T/h.raw"
+if [ "$RUN_RC" != 0 ]; then
+  echo "--help exited rc=$RUN_RC (output above)" >&2
   exit 1
 fi
-if ! echo "$H" | grep -q "^Usage: neo"; then
-  echo "usage text missing from --help output" >&2
-  exit 1
-fi
+tr -d '\r' < "$T/h.raw" | grep -q "^Usage: neo" \
+  || { echo "usage text missing from --help output" >&2; exit 1; }
 
 echo "--- render test (pty, ~3 s) ---"
 set +e
