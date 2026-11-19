@@ -24,6 +24,12 @@ if [ -n "${EMU_PREFIX:-}" ]; then
   PREFIX="$EMU_PREFIX"
 fi
 
+# neo initializes ncurses even on its --version path, and runners run with
+# TERM unset ("Error opening terminal: unknown."). Force a terminal the
+# bundled terminfo database certainly has — deterministic CI is worth more
+# than respecting an ambient TERM here.
+export TERM=xterm-256color
+
 # Probe: extract the AppImage (if it is one) so we can retry with the inner
 # binary directly when the extract-and-run path fails — that separates
 # runtime/AppRun problems from binary problems in one run.
@@ -75,7 +81,6 @@ if ! echo "$H" | grep -q "^Usage: neo"; then
 fi
 
 echo "--- render test (pty, ~3 s) ---"
-export TERM="${TERM:-xterm-256color}"
 set +e
 timeout 4 script -qec "APPIMAGE_EXTRACT_AND_RUN=1 $PREFIX $NEO_APP -f 30" "$T/out.raw"
 rc=$?
