@@ -2,6 +2,8 @@
 
 [![Build and release](https://github.com/hcet-sudo/neo-appimage/actions/workflows/release.yml/badge.svg)](https://github.com/hcet-sudo/neo-appimage/actions/workflows/release.yml)
 
+<img width="594" height="411" alt="neo_is_awesome" src="https://github.com/user-attachments/assets/700ceea6-9556-4232-b135-a6e5b6d63090" />
+
 Unofficial, **fully static** AppImage of [neo](https://github.com/st3w/neo) —
 Stewart Reive's terminal recreation of the *Matrix* "digital rain" (a CMatrix
 clone with 32-bit color and Unicode support) — for x86_64 Linux. Static means
