@@ -3,6 +3,8 @@
 [![Build and release](https://github.com/hcet-sudo/neo-appimage/actions/workflows/release.yml/badge.svg)](https://github.com/hcet-sudo/neo-appimage/actions/workflows/release.yml)
 
 <img width="594" height="411" alt="neo_is_awesome" src="https://github.com/user-attachments/assets/700ceea6-9556-4232-b135-a6e5b6d63090" />
+<img width="1000" height="600" alt="neo-rain-1" src="https://github.com/user-attachments/assets/97a60096-5aeb-4202-a349-9453d0f6524d" />
+
 
 Unofficial, **fully static** AppImage of [neo](https://github.com/st3w/neo) —
 Stewart Reive's terminal recreation of the *Matrix* "digital rain" (a CMatrix
